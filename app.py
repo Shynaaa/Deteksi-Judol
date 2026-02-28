@@ -25,7 +25,7 @@ nltk.data.path.append(os.path.join(BASE_DIR, "nltk_data"))
 stop_words = set(stopwords.words('indonesian'))
 try:
     stemmer = StemmerFactory().create_stemmer()
-except Exception as e:a
+except Exception as e:
     print(f"Gagal load stemmer: {e}")
     stemmer = None
 
@@ -413,6 +413,7 @@ def upload():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
