@@ -30,14 +30,10 @@ with open('model/tokenizer3.pkl', 'rb') as f:
 
 MAXLEN = 15 
 
-# ================= NLTK SETUP =================
-nltk.download('punkt')
-nltk.download('stopwords')
-
+# ===========LOAD NLTK===========
+nltk.data.path.append("./nltk_data")
 stop_words = set(stopwords.words('indonesian'))
-
-factory = StemmerFactory()
-stemmer = factory.create_stemmer()
+stemmer = StemmerFactory().create_stemmer()
 
 # ===========PREPROCESSING==============
 def normalize_unicode(text):
@@ -447,3 +443,4 @@ def upload():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
