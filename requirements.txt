@@ -1,5 +1,5 @@
 Flask
-tensorflow==2.20.0
+tensorflow-cpu==2.20.0
 numpy
 pandas
 regex
@@ -9,6 +9,7 @@ sastrawi
 openpyxl
 xlrd
 gunicorn
+
 
 
 
