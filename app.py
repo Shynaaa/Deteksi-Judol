@@ -20,9 +20,14 @@ app = Flask(__name__)
 app.secret_key = "secretkey123"
 
 # ===========LOAD NLTK===========
-nltk.data.path.append(os.path.join(os.path.dirname(__file__), "nltk_data"))
+BASE_DIR = os.path.dirname(__file__)
+nltk.data.path.append(os.path.join(BASE_DIR, "nltk_data"))
 stop_words = set(stopwords.words('indonesian'))
-stemmer = StemmerFactory().create_stemmer()
+try:
+    stemmer = StemmerFactory().create_stemmer()
+except Exception as e:a
+    print(f"Gagal load stemmer: {e}")
+    stemmer = None
 
 # ================= LOAD MODEL =================
 model = tf.keras.models.load_model('model/model3.keras')
@@ -406,6 +411,8 @@ def upload():
 # ================= RUN =================
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
+
 
 
