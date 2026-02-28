@@ -10,6 +10,9 @@ from flask import Flask, render_template, request, session, flash, redirect
 import pandas as pd
 import os
 import uuid
+from io import BytesIO
+import base64
+import time
 
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from nltk.tokenize import word_tokenize
@@ -19,18 +22,22 @@ from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 app = Flask(__name__)
 app.secret_key = "secretkey123"
 
-# ===========LOAD NLTK===========
-BASE_DIR = os.path.dirname(__file__)
-nltk.data.path.append(os.path.join(BASE_DIR, "nltk_data"))
-stop_words = set(stopwords.words('indonesian'))
-stemmer = StemmerFactory().create_stemmer()
-
 # ================= LOAD MODEL =================
 model = tf.keras.models.load_model('model/model3.keras')
+
 with open('model/tokenizer3.pkl', 'rb') as f:
     tokenizer = pickle.load(f)
 
 MAXLEN = 15 
+
+# ================= NLTK SETUP =================
+nltk.download('punkt')
+nltk.download('stopwords')
+
+stop_words = set(stopwords.words('indonesian'))
+
+factory = StemmerFactory()
+stemmer = factory.create_stemmer()
 
 # ===========PREPROCESSING==============
 def normalize_unicode(text):
@@ -308,11 +315,10 @@ def allowed_file(filename):
            filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # ================= ROUTE =================
-# ================= HALAMAN UTAMA =================
+
 @app.route("/")
 def home():
     return render_template("home.html")
-
 
 @app.route("/komentartunggal", methods=["GET", "POST"])
 def komentartunggal():
@@ -327,7 +333,6 @@ def komentartunggal():
                            result=result,
                            confidence=confidence)
 
-
 @app.route("/upload", methods=["GET", "POST"])
 def upload():
 
@@ -339,78 +344,106 @@ def upload():
     total_non = 0
     duration = 0
     original_filename = None
+    file_b64 = None
 
     if request.method == "POST":
+        step = request.form.get("step")
 
-        file = request.files["file"]
+        if step == "preview":
+            file = request.files.get("file")
+            if not file:
+                flash("Silakan pilih file terlebih dahulu.", "danger")
+                return render_template("upload.html")
 
-        if file.filename == "":
-            flash("Silakan pilih file terlebih dahulu.", "danger")
-            return redirect(request.url)
+            if not allowed_file(file.filename):
+                flash("Format file tidak didukung!", "danger")
+                return render_template("upload.html")
 
-        if not allowed_file(file.filename):
-            flash("Format file tidak didukung! Hanya CSV, XLS, dan XLSX yang diperbolehkan.", "danger")
-            return redirect(request.url)
+            original_filename = file.filename
 
-        original_filename = file.filename
+            # simpan file di memory
+            file_bytes = file.read()
+            file_b64 = base64.b64encode(file_bytes).decode("utf-8")
+            file_stream = BytesIO(file_bytes)
 
-        if file.filename.endswith(".csv"):
-            df = pd.read_csv(file, encoding="utf-8-sig")
-        else:
-            df = pd.read_excel(file)
-
-        preview = df.head().to_html(classes="table table-bordered", index=False)
-
-        # auto detect kolom komentar
-        keywords = ["komentar", "comment", "komen", "koment"]
-        for col in df.columns:
-            if any(k in col.lower() for k in keywords):
-                comment_col = col
-                break
-
-        if comment_col is None:
-            comment_col = df.columns[0]
-
-        import time
-        start = time.time()
-
-        results = []
-
-        for text in df[comment_col].astype(str):
-            label, _ = predict_text(text)
-
-            if label == "Judol":
-                total_judol += 1
+            if file.filename.endswith(".csv"):
+                df = pd.read_csv(file_stream, encoding="utf-8-sig")
             else:
-                total_non += 1
+                df = pd.read_excel(file_stream)
 
-            results.append(label)
+            preview = df.head().to_html(classes="table table-bordered", index=False)
 
-        df["Hasil_Deteksi"] = results
+            # deteksi kolom komentar
+            keywords = ["komentar", "comment", "komen", "koment"]
+            for col in df.columns:
+                if any(k in col.lower() for k in keywords):
+                    comment_col = col
+                    break
+            if comment_col is None:
+                comment_col = df.columns[0]
 
-        end = time.time()
-        duration = round(end - start, 2)
+            return render_template("upload.html",
+                                   preview=preview,
+                                   original_filename=original_filename,
+                                   comment_col=comment_col,
+                                   file_b64=file_b64)
 
-        total_data = len(df)
+        elif step == "process":
+            file_b64 = request.form.get("file_b64")
+            original_filename = request.form.get("original_filename")  # ambil nama asli
+            if not file_b64 or not original_filename:
+                flash("File tidak tersedia untuk diproses.", "danger")
+                return render_template("upload.html")
 
-        table = df.to_html(classes="table table-striped table-bordered", index=False)
+            file_bytes = base64.b64decode(file_b64)
+            file_stream = BytesIO(file_bytes)
 
-    return render_template("upload.html",
-                           original_filename=original_filename,
-                           preview=preview,
-                           table=table,
-                           comment_col=comment_col,
-                           total_data=total_data,
-                           total_judol=total_judol,
-                           total_non=total_non,
-                           duration=duration)
+            # load df
+            try:
+                df = pd.read_csv(file_stream, encoding="utf-8-sig")
+            except:
+                file_stream.seek(0)
+                df = pd.read_excel(file_stream)
+
+            # deteksi kolom komentar
+            keywords = ["komentar", "comment", "komen", "koment"]
+            comment_col = None
+            for col in df.columns:
+                if any(k in col.lower() for k in keywords):
+                    comment_col = col
+                    break
+            if comment_col is None:
+                comment_col = df.columns[0]
+
+            # proses deteksi
+            start = time.time()
+            results = []
+            total_judol = 0
+            total_non = 0
+            for text in df[comment_col].astype(str):
+                label, _ = predict_text(text)  # pakai fungsi deteksi Seli
+                results.append(label)
+                if label == "Judol":
+                    total_judol += 1
+                else:
+                    total_non += 1
+
+            df["Hasil_Deteksi"] = results
+            end = time.time()
+            duration = round(end - start, 2)
+            total_data = len(df)
+            table = df.to_html(classes="table table-striped table-bordered", index=False)
+
+            return render_template("upload.html",
+                                   table=table,
+                                   original_filename=original_filename,
+                                   total_data=total_data,
+                                   total_judol=total_judol,
+                                   total_non=total_non,
+                                   duration=duration)
+    else:
+        return render_template("upload.html")
 # ================= RUN =================
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
-
-
-
-
-
+    app.run(debug=True)
