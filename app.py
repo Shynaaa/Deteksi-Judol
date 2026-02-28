@@ -19,22 +19,17 @@ from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 app = Flask(__name__)
 app.secret_key = "secretkey123"
 
+# ===========LOAD NLTK===========
+nltk.data.path.append(os.path.join(os.path.dirname(__file__), "nltk_data"))
+stop_words = set(stopwords.words('indonesian'))
+stemmer = StemmerFactory().create_stemmer()
+
 # ================= LOAD MODEL =================
 model = tf.keras.models.load_model('model/model3.keras')
-
 with open('model/tokenizer3.pkl', 'rb') as f:
     tokenizer = pickle.load(f)
 
 MAXLEN = 15 
-
-# ================= NLTK SETUP =================
-nltk.download('punkt')
-nltk.download('stopwords')
-
-stop_words = set(stopwords.words('indonesian'))
-
-factory = StemmerFactory()
-stemmer = factory.create_stemmer()
 
 # ===========PREPROCESSING==============
 def normalize_unicode(text):
@@ -411,5 +406,6 @@ def upload():
 # ================= RUN =================
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000)
+
 
