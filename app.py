@@ -23,11 +23,7 @@ app.secret_key = "secretkey123"
 BASE_DIR = os.path.dirname(__file__)
 nltk.data.path.append(os.path.join(BASE_DIR, "nltk_data"))
 stop_words = set(stopwords.words('indonesian'))
-try:
-    stemmer = StemmerFactory().create_stemmer()
-except Exception as e:
-    print(f"Gagal load stemmer: {e}")
-    stemmer = None
+stemmer = StemmerFactory().create_stemmer()
 
 # ================= LOAD MODEL =================
 model = tf.keras.models.load_model('model/model3.keras')
@@ -413,6 +409,7 @@ def upload():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
