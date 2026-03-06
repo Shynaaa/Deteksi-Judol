@@ -30,10 +30,14 @@ with open('model/tokenizer3.pkl', 'rb') as f:
 
 MAXLEN = 15 
 
-# ===========LOAD NLTK===========
-nltk.data.path.append("./nltk_data")
+# ================= NLTK SETUP =================
+nltk.download('punkt')
+nltk.download('stopwords')
+
 stop_words = set(stopwords.words('indonesian'))
-stemmer = StemmerFactory().create_stemmer()
+
+factory = StemmerFactory()
+stemmer = factory.create_stemmer()
 
 # ===========PREPROCESSING==============
 def normalize_unicode(text):
@@ -414,17 +418,20 @@ def upload():
             # proses deteksi
             start = time.time()
             results = []
+            confidence = []
             total_judol = 0
             total_non = 0
             for text in df[comment_col].astype(str):
-                label, _ = predict_text(text)  # pakai fungsi deteksi Seli
+                label, conf = predict_text(text)  
                 results.append(label)
+                confidence.append(round(conf,3))
                 if label == "Judol":
                     total_judol += 1
                 else:
                     total_non += 1
 
             df["Hasil_Deteksi"] = results
+            df["Confidence"] = confidence
             end = time.time()
             duration = round(end - start, 2)
             total_data = len(df)
@@ -443,4 +450,3 @@ def upload():
 
 if __name__ == "__main__":
     app.run(debug=True)
-
