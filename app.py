@@ -424,7 +424,7 @@ def upload():
             for text in df[comment_col].astype(str):
                 label, conf = predict_text(text)  
                 results.append(label)
-                confidence.append(round(conf,3))
+                confidence.append(round(conf,2))
                 if label == "Judol":
                     total_judol += 1
                 else:
@@ -449,4 +449,5 @@ def upload():
 # ================= RUN =================
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()
+
